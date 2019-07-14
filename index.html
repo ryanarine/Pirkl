@@ -1,0 +1,1153 @@
+<canvas id="ctx" width="500" height="500" style="border:1px solid #000000;"></canvas>
+<script>
+var ctx = document.getElementById("ctx").getContext("2d");
+var WIDTH = 500;
+var HEIGHT = 500;
+var Shift = 0;
+var Levelx = 50;
+var WhichLevel;
+var LevelRad = 40,OptionRad = 40,ArcadeRad = 40,OnRad = 40,OffRad = 40,BackRad = 40,UpRad = 30,DownRad = 30;
+var Zooming = false; 
+var Index = 0;
+var One = 1;
+var Constant, distance, crash, score, Menu, Options, Stages,Refresh,RefreshPos,RefreshGen;
+var Playing = false, Arcade = false;
+var background = new Image();
+background.src = "Background.png";
+var backgroundx = 728;
+var backgroundy = 328;
+var music = new Audio();
+music.src = "music.mp3";
+music.loop = true;
+var Enemylist = [];
+var Player = {
+	x:250,
+	spdx:5,
+	maxspdx:5,
+	y:250,
+	spdy:5,
+	maxspdy:5,
+	radius:20,
+	maxradius:20,
+	SA:0,
+	EA:2*Math.PI,
+	colour:"green",
+	pressingRight:false,
+	pressingLeft:false,
+	pressingUp:false,
+	pressingDown:false,
+	Speeding:false,
+	Alive:true,
+};
+function PlayerRefresh(){
+	Player.x = 250;
+	Player.spdx = 5;
+	Player.maxspdx = 5;
+	Player.y = 250;
+	Player.spdy = 5;
+	Player.maxspdy = 5;
+	Player.radius = 20;
+	Player.maxradius = 20;
+	Player.SA = 0;
+	Player.EA = 2*Math.PI;
+	Player.colour = "green";
+	Player.pressingRight = false;
+	Player.pressingLeft = false;
+	Player.pressingUp = false;
+	Player.pressingDown = false;
+	Player.Speeding = false;
+	Player.Alive = true;
+	Playing = true;
+	Enemylist.length = 0;
+}
+function MainMenu(){
+	ctx.drawImage(background,backgroundx,backgroundy,733,733,0,0,WIDTH,HEIGHT);
+	if (backgroundy >= background.height - 733){
+		One = -1;}
+	else if (backgroundy <= 0){
+		One = 1;}	
+	backgroundx += One;
+	backgroundy += One;
+    Title();
+	ctx.beginPath();
+	ctx.fillStyle = "red";
+	if (!Playing){
+		document.addEventListener("mousemove",mousemove); 
+	}
+	ctx.arc(250,175,LevelRad,0,2*Math.PI);
+	ctx.closePath();
+	ctx.arc(250,275,OptionRad,0,2*Math.PI);
+	ctx.closePath();
+	ctx.arc(250,375,ArcadeRad,0,2*Math.PI);
+	ctx.closePath();
+	ctx.fill();
+	ctx.fillStyle = "white";
+	ctx.font = "18pt Segoe UI Light";
+	ctx.fillText("Levels",218,180);
+	ctx.fillText("Options",210,280);
+	ctx.fillText("Arcade",215,380);
+	if (!Playing){
+		document.addEventListener("click",click);
+	}	
+	if (Playing){
+		Refresh = setInterval(Update,25);
+		RefreshPos = setInterval(UpdateEnemyPosition,35);
+		RefreshGen = setInterval(GenerateEnemy,2500);
+		clearInterval(Menu);
+	}
+}
+function PlayerPrint(){
+	//function occurs roughly 40 times per second.  Divide by 120 to make decrease rate last 3 seconds
+	if (Player.Speeding){
+		if (Player.radius - Player.maxradius/120 >= 0){
+			Player.radius -= Player.maxradius/120;}
+		else {Player.radius = 0;
+		Player.Alive = false;} //Game over	
+			}
+	else {
+		if(Player.radius + Player.maxradius/240 <= Player.maxradius && Player.radius != 0){
+		    Player.radius += Player.maxradius/240;}
+			
+		else if (Player.radius + Player.maxradius/240 > Player.maxradius && Player.radius != 0){
+			Player.radius = Player.maxradius;}
+	}
+	Zoomout();		
+	ctx.beginPath();
+	ctx.arc(Player.x, Player.y, Player.radius, Player.SA,Player.EA);
+	ctx.strokeStyle = Player.colour;
+	ctx.fillStyle = Player.colour;
+	ctx.fill();
+}
+function EnemyPrint(){
+	for (var num = 0;num < Enemylist.length;num+=1){
+		ctx.beginPath();
+		ctx.arc(Enemylist[num].x, Enemylist[num].y, Enemylist[num].radius, Enemylist[num].SA,Enemylist[num].EA)
+		if (Player.radius > Enemylist[num].radius){
+			Enemylist[num].colour = "yellow";}
+		else if (Player.radius == Enemylist[num].radius){
+			Enemylist[num].colour = "orange";}
+		else if (Player.radius < Enemylist[num].radius){
+			Enemylist[num].colour = "red";}	
+		ctx.strokeStyle = Enemylist[num].colour;
+		ctx.fillStyle = Enemylist[num].colour;
+		ctx.fill();
+		ctx.closePath();
+	}
+}
+function UpdatePlayerPosition(){
+	if(Player.pressingRight)
+		Player.x += Player.spdx;
+		if(Player.x > WIDTH){
+			Player.x = 0;}	
+	if(Player.pressingLeft)
+		Player.x -= Player.spdx;
+		if(Player.x < 0){
+			Player.x = WIDTH;}	
+	if(Player.pressingUp)
+		Player.y -= Player.spdy;
+		if(Player.y < 0){
+			Player.y = HEIGHT;}	
+	if(Player.pressingDown)
+		Player.y += Player.spdy;
+		if(Player.y > HEIGHT){
+			Player.y = 0;}			
+}
+function UpdateEnemyPosition(){
+	if (Player.Alive){
+		for (var num =0;num < Enemylist.length;num+=1){
+			distance = Math.sqrt((Enemylist[num].x - Player.x)*(Enemylist[num].x - Player.x)+(Enemylist[num].y - Player.y)*(Enemylist[num].y - Player.y));
+			if (Enemylist[num].colour == "red"){
+				if (Player.x > Enemylist[num].x && Player.y > Enemylist[num].y && distance < Enemylist[num].radius * 3){
+						if (Player.x - Enemylist[num].x < Enemylist[num].spdx){
+							Enemylist[num].x += Player.x - Enemylist[num].x;}
+						else {	
+							Enemylist[num].x += Enemylist[num].spdx;} //Player is bottom right
+						if (Player.y - Enemylist[num].y < Enemylist[num].spdy){
+							Enemylist[num].y += Player.y - Enemylist[num].y;}
+						else {	
+						Enemylist[num].y += Enemylist[num].spdy;}
+						}
+				else if (Player.x < Enemylist[num].x && Player.y > Enemylist[num].y && distance < Enemylist[num].radius * 3){
+						if (Enemylist[num].x - Player.x < Enemylist[num].spdx){
+							Enemylist[num].x -= Enemylist[num].x - Player.x;}
+						else {	
+							Enemylist[num].x -= Enemylist[num].spdx;}
+						if (Player.y - Enemylist[num].y < Enemylist[num].spdy){
+							Enemylist[num].y += Player.y - Enemylist[num].y;}//Player is bottom left
+						else {
+							Enemylist[num].y += Enemylist[num].spdy;}
+						}
+				else if (Player.x < Enemylist[num].x && Player.y < Enemylist[num].y && distance < Enemylist[num].radius * 3){
+						if (Enemylist[num].x - Player.x < Enemylist[num].spdx){
+							Enemylist[num].x -= Enemylist[num].x - Player.x;}
+						else {	
+							Enemylist[num].x -= Enemylist[num].spdx;} //Player is top left
+						if (Enemylist[num].y - Player.y < Enemylist[num].spdy){
+							Enemylist[num].y -= Enemylist[num].y - Player.y;}
+						else {	
+							Enemylist[num].y -= Enemylist[num].spdy;}
+						}
+				else if (Player.x > Enemylist[num].x && Player.y < Enemylist[num].y && distance < Enemylist[num].radius * 3){
+						if (Player.x - Enemylist[num].x < Enemylist[num].spdx){
+							Enemylist[num].x += Player.x - Enemylist[num].x;}
+						else {	
+							Enemylist[num].x += Enemylist[num].spdx;} //Player is top right
+						if (Enemylist[num].y - Player.y < Enemylist[num].spdy){
+							Enemylist[num].y -= Enemylist[num].y - Player.y;}
+						else {	
+							Enemylist[num].y -= Enemylist[num].spdy;}
+						} 
+				else if (Player.x > Enemylist[num].x && distance < Enemylist[num].radius*3 && Player.y == Enemylist[num].y){
+						Enemylist[num].x += Enemylist[num].spdx;} //Player is right
+				else if (Player.x < Enemylist[num].x && distance < Enemylist[num].radius*3 && Player.y == Enemylist[num].y){
+						Enemylist[num].x -= Enemylist[num].spdx;} //Player is left
+				else if (Player.y < Enemylist[num].y && distance < Enemylist[num].radius*3 && Player.x == Enemylist[num].x){
+						Enemylist[num].y -= Enemylist[num].spdx;} //Player is top
+				else if (Player.y > Enemylist[num].y && distance < Enemylist[num].radius*3 && Player.x == Enemylist[num].x){
+						Enemylist[num].y += Enemylist[num].spdx;} //Player is bottom		
+				else {Enemylist[num].x += Math.floor((Math.random() * Enemylist[num].spdx * 2 ) - Enemylist[num].spdx); //Player is out of range
+				Enemylist[num].y += Math.floor((Math.random() * Enemylist[num].spdy * 2 ) - Enemylist[num].spdy);}
+				if (Enemylist[num].x > WIDTH){Enemylist[num].x = 0;}
+				else if (Enemylist[num].x < 0){Enemylist[num].x = WIDTH;}
+				
+				if (Enemylist[num].y > HEIGHT){Enemylist[num].y = 0;}
+				else if (Enemylist[num].y < 0){Enemylist[num].y = HEIGHT;}		
+			}
+			else if(Enemylist[num].colour == "yellow"){
+				if (Player.x > Enemylist[num].x && distance < Enemylist[num].radius * 3 && Player.y > Enemylist[num].y){
+					Enemylist[num].x -= Enemylist[num].spdx; //Player is bottom right
+					Enemylist[num].y -= Enemylist[num].spdy;
+						}
+				else if (Player.x < Enemylist[num].x && distance < Enemylist[num].radius * 3 && Player.y > Enemylist[num].y){
+					Enemylist[num].x += Enemylist[num].spdx; //Player is bottom left
+					Enemylist[num].y -= Enemylist[num].spdy;
+						}
+				else if (Player.x < Enemylist[num].x && distance < Enemylist[num].radius * 3 && Player.y < Enemylist[num].y){
+						Enemylist[num].x += Enemylist[num].spdx; //Player is top left
+						Enemylist[num].y += Enemylist[num].spdy;
+						}
+				else if (Player.x > Enemylist[num].x && distance < Enemylist[num].radius * 3 && Player.y < Enemylist[num].y){
+						Enemylist[num].x -= Enemylist[num].spdx; //Player is top right
+						Enemylist[num].y += Enemylist[num].spdy;
+						}
+				else if (Player.x > Enemylist[num].x && distance < Enemylist[num].radius*3 && Player.y == Enemylist[num].y){
+						Enemylist[num].x -= Enemylist[num].spdx;} //Player is right
+				else if (Player.x < Enemylist[num].x && distance < Enemylist[num].radius*3 && Player.y == Enemylist[num].y){
+						Enemylist[num].x += Enemylist[num].spdx;} //Player is left
+				else if (Player.y < Enemylist[num].y && distance < Enemylist[num].radius*3 && Player.x == Enemylist[num].x){
+						Enemylist[num].y += Enemylist[num].spdy;} //Player is top
+				else if (Player.y > Enemylist[num].y && distance < Enemylist[num].radius*3 && Player.x == Enemylist[num].x){
+						Enemylist[num].y -= Enemylist[num].spdy;} //Player is bottom		
+				else {Enemylist[num].x += Math.floor((Math.random() * Enemylist[num].spdx * 2 ) - Enemylist[num].spdx); //Player is out of range
+				Enemylist[num].y += Math.floor((Math.random() * Enemylist[num].spdy * 2 ) - Enemylist[num].spdy);}
+				if (Enemylist[num].x > WIDTH){Enemylist[num].x = 0;}
+				else if (Enemylist[num].x < 0){Enemylist[num].x = WIDTH;}
+				if (Enemylist[num].y > HEIGHT){Enemylist[num].y = 0;}
+				else if (Enemylist[num].y < 0){Enemylist[num].y = HEIGHT;}				
+			}
+			else {
+				Enemylist[num].x += Math.floor((Math.random() * Enemylist[num].spdx * 2 ) - Enemylist[num].spdx);
+				Enemylist[num].y += Math.floor((Math.random() * Enemylist[num].spdy * 2 ) - Enemylist[num].spdy);	
+				if (Enemylist[num].x > WIDTH){Enemylist[num].x = 0;}
+				else if (Enemylist[num].x < 0){Enemylist[num].x = WIDTH;}
+				if (Enemylist[num].y > HEIGHT){Enemylist[num].y = 0;}
+				else if (Enemylist[num].y < 0){Enemylist[num].y = HEIGHT;}	}
+		}
+	}
+}
+function Update(){
+	if (Enemylist.length == 0 && !Arcade){
+		Player.Alive = false;
+		ctx.fillStyle = "white";
+		ctx.font = '22pt Segoe UI Light'
+		if (WhichLevel != 30){
+			ctx.fillText("Press 'E' to go to the next level",62,375);
+			ctx.fillText("Congrats! You won!",130,150);}
+		else {
+			ctx.fillStyle = "red";
+			ctx.fillText("Congratulations!",150,75);
+			ctx.fillText("You Beat the whole game!!!",82,150);
+			ctx.fillText("Press 'E' to go to Arcade mode",65,375);
+			}	
+		ctx.fillText("Press 'R' to restart",142,225);
+		ctx.fillText("Press 'Q' to quit",155,300);
+		clearInterval(RefreshPos);
+		clearInterval(Refresh);
+		}
+	else {
+		if (Player.Alive){
+			UpdatePlayerPosition();
+			ctx.clearRect(0,0,WIDTH,HEIGHT);
+			ctx.drawImage(background,728,328,733,733,0,0,WIDTH,HEIGHT);
+			Eat()
+			PlayerPrint();
+			EnemyPrint();
+			if (Arcade){
+				score = Math.floor(score);
+				ctx.fillStyle = "white";
+				ctx.font = '18pt Segoe UI Light';
+				ctx.fillText("Radius: " + score,200,50);}
+		}
+		else {
+			ctx.fillStyle = "white";
+			ctx.font = '20pt Segoe UI Light';
+			ctx.fillText("Game over! Press 'R' to restart",67,250);
+			ctx.font = '20pt Segoe UI Light';
+			ctx.fillText("Press 'Q' to exit to the main menu",42,300);}
+	}	
+}
+function Zoomout(){
+	if (Player.Alive && Arcade){
+		if (Player.maxradius >= WIDTH/8 && Zooming == false){
+			Zooming = true;
+			Constant = Player.maxradius/64;}
+		if (Zooming){	
+			for (var num = 0; num < Enemylist.length; num+=1){
+				if (Enemylist[num].radius - Constant <= 0){
+					Enemylist.splice(num,1);}
+				else {	
+					Enemylist[num].radius -= Constant;
+					Enemylist[num].spdx = 100/Enemylist[num].radius;
+					Enemylist[num].spdy = Enemylist[num].spdx;
+				}
+			}
+			if (Player.radius - Constant > 0){
+				Player.radius -= Constant;}
+			Player.maxradius -= Constant;
+			Player.maxspdx = 100/Player.maxradius;
+			Player.maxspdy = Player.maxspdx;
+			Player.spdy = Player.maxspdy;
+			Player.spdx = Player.maxspdx;
+			Index += 1;
+			ctx.fillStyle = "white";
+			ctx.font = '30pt Times Roman'
+			ctx.fillText("Zooming Out!",150,250);
+		}
+		if (Index == 48){
+			Index = 0;
+			Zooming = false;
+		}
+	}
+	else {Zooming = false;}
+}
+function Eat(){
+	for (var num = 0;num < Enemylist.length;num+=1){
+		distance = Math.sqrt((Enemylist[num].x - Player.x)*(Enemylist[num].x - Player.x)+(Enemylist[num].y - Player.y)*(Enemylist[num].y - Player.y));
+		if (distance <= Player.radius - Enemylist[num].radius/2 && Enemylist[num].colour == "yellow"){
+			score += Math.floor(Math.sqrt(Player.maxradius * Player.maxradius + Enemylist[num].radius * Enemylist[num].radius)) - Player.maxradius;
+			Player.maxradius = Math.sqrt(Player.maxradius * Player.maxradius + Enemylist[num].radius * Enemylist[num].radius);
+			Math.floor(Math.sqrt(Player.maxradius * Player.maxradius + Enemylist[num].radius * Enemylist[num].radius));
+			Player.radius = Math.sqrt(Player.radius * Player.radius + Enemylist[num].radius * Enemylist[num].radius);
+			Player.maxspdx = 100/Player.maxradius;
+			Player.maxspdy = Player.maxspdx;
+			Player.spdx = Player.maxspdx;
+			Player.spdy = Player.maxspdy;
+			Enemylist.splice(num,1);} 
+		else if (distance <= Enemylist[num].radius - Player.radius/2 && Enemylist[num].colour == "red"){
+			Enemylist[num].radius = Math.sqrt(Player.radius * Player.radius + Enemylist[num].radius * Enemylist[num].radius);
+			Player.radius = 0;
+			Player.Alive = false;}
+	}	
+}
+function GenerateEnemy(){
+	if (Player.Alive){
+		var x = Math.floor(Math.random()*WIDTH*0.6) + 100;
+		var y = Math.floor(Math.random()*HEIGHT*0.6) + 100;
+		crash = 0;
+		while (Player.x + Player.radius*4 >= x && Player.x - Player.radius*4 <= x && Player.y + Player.radius*4 >= y && Player.y - Player.radius*4 <= y && crash < 25){
+			y = Math.floor(Math.random()*HEIGHT*0.6) + 100;
+			x = Math.floor(Math.random()*HEIGHT*0.6) + 100;
+			crash += 1;}
+		if (crash < 25){	
+			var radius = Math.floor((Math.random()*Player.maxradius) + Player.maxradius/2);
+			var spdx = 100/radius;
+			var spdy = spdx;
+			AddEnemies(x,spdx,y,spdy,radius,0,2*Math.PI,"red");}
+	}
+}
+function AddEnemies(x,spdx,y,spdy,radius,SA,EA,colour){
+	var Enemy = {
+		x:x,
+		spdx:spdx,
+		y:y,
+		spdy:spdy,
+		radius:radius,
+		SA:SA,
+		EA:EA,
+		colour:colour,
+	};
+	Enemylist.push(Enemy);
+}
+function Title(){
+ctx.beginPath();
+ctx.lineWidth = "3";
+ctx.strokeStyle = "white";
+ctx.moveTo(200,50);
+ctx.lineTo(200,25);
+ctx.stroke();
+ctx.beginPath();
+ctx.arc(204,25,7,0,Math.PI*2);
+ctx.moveTo(225,50);
+ctx.lineTo(225,35);
+ctx.stroke();
+ctx.beginPath();
+ctx.arc(225,25,5,0,Math.PI*2);
+ctx.moveTo(250,50);
+ctx.lineTo(250,25);
+ctx.stroke();
+ctx.beginPath();
+ctx.arc(254,25,7,0,Math.PI*2);
+ctx.moveTo(258,30);
+ctx.lineTo(264,48);
+ctx.moveTo(280,50);
+ctx.lineTo(280,20);
+ctx.moveTo(280,37);
+ctx.lineTo(290,20);
+ctx.moveTo(280,37);
+ctx.lineTo(290,48);
+ctx.moveTo(310,20);
+ctx.lineTo(310,50);
+ctx.lineTo(320,50);
+ctx.stroke();
+}
+function Option(){
+	ctx.drawImage(background,backgroundx,backgroundy,733,733,0,0,WIDTH,HEIGHT);
+	if (backgroundy >= background.height - 733){
+		One = -1;}
+	else if (backgroundy <= 0){
+		One = 1;}	
+	backgroundx += One;
+	backgroundy += One;
+	Title();
+	ctx.fillStyle = "orange";
+	ctx.beginPath();
+	ctx.arc(450,450,BackRad,0,2*Math.PI);
+	ctx.fill();
+	ctx.fillStyle = "green";
+	ctx.beginPath();
+	ctx.arc(265,245,OnRad,0,2*Math.PI);
+	ctx.fill();
+	ctx.beginPath();
+	ctx.arc(265,345,UpRad,0,2*Math.PI);
+	ctx.fill();
+	ctx.fillStyle = "red";
+	ctx.beginPath();
+	ctx.arc(370,245,OffRad,0,2*Math.PI);
+	ctx.fill();
+	ctx.beginPath();
+	ctx.arc(370,345,DownRad,0,2*Math.PI);
+	ctx.fill();
+	ctx.fillStyle = "white";
+	ctx.fillText("Music:          ON          OFF", 115,250);
+	ctx.fillText("Back",425,455);
+	ctx.fillText("Volume: " + (Math.floor(music.volume*100)) + "%",80,352);
+	ctx.fillText("+",256,352);
+	ctx.fillText("_",364,342);
+	document.addEventListener("mousemove",optionmouse);
+	document.addEventListener("click",optionclick);
+}
+function Levels(){
+	ctx.drawImage(background,backgroundx,backgroundy,733,733,0,0,WIDTH,HEIGHT);
+	if (backgroundy >= background.height - 733){
+		One = -1;}
+	else if (backgroundy <= 0){
+		One = 1;}	
+	backgroundx += One;
+	backgroundy += One;
+	Title();
+	Slide();
+	ctx.beginPath();
+	ctx.fillStyle = "orange";
+	ctx.arc(50,50,40,0,2*Math.PI);
+	ctx.fill();
+	ctx.beginPath();
+	ctx.arc(450,50,40,0,2*Math.PI);
+	ctx.fill();
+	ctx.fillStyle = "white";
+	ctx.fillText("Back",25,55);
+	ctx.fillText("<>",434,55);
+	document.addEventListener("click",levelclick);
+}
+function LevelStart(Level){
+	PlayerRefresh();
+	switch(Level){
+	case 1:AddEnemies(400,100/30,450,100/30,30,0,Math.PI*2,"red");
+	AddEnemies(200,100/20,250,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(300,100/15,200,100/15,15,0,Math.PI*2,"yellow");break;
+	case 2:AddEnemies(400,100/30,450,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(300,100/25,100,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(300,100/15,100,100/15,15,0,Math.PI*2,"yellow");break;
+	case 3:AddEnemies(123,100/15,246,100/15,15,0,Math.PI*2,"yellow");
+    AddEnemies(260,100/20,240,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(400,100/25,450,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(320,100/Math.sqrt(1025),146,100/Math.sqrt(1025),Math.sqrt(1025),0,Math.PI*2,"red");
+	AddEnemies(200,100/Math.sqrt(1650),150,100/Math.sqrt(1650),Math.sqrt(1650),0,Math.PI*2,"red");break;
+	case 4:AddEnemies(450,100/1,450,100/1,1,0,Math.PI*2,"yellow");break;
+	case 5:AddEnemies(100,100/10,100,100/10,10,0,Math.PI*2,"yellow");
+    AddEnemies(300,100/10,300,100/10,10,0,Math.PI*2,"yellow");
+	AddEnemies(400,100/10,400,100/10,10,0,Math.PI*2,"yellow");
+	AddEnemies(200,100/10,200,100/10,10,0,Math.PI*2,"yellow");
+	AddEnemies(100,100/26,100,100/26,26,0,Math.PI*2,"red");break;
+	case 6:AddEnemies(456,100/40,420,100/40,40,0,Math.PI*2,"red");
+    AddEnemies(375,100/30,180,100/30,30,0,Math.PI*2,"red");
+	AddEnemies(205,100/27,480,100/27,27,0,Math.PI*2,"red");
+	AddEnemies(300,100/15,150,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(400,100/20,450,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(379,100/19,250,100/19,19,0,Math.PI*2,"yellow");break;
+	case 7:AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
+    AddEnemies(200,100/20,250,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(380,100/25,150,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(270,100/Math.sqrt(1025),50,100/Math.sqrt(1025),Math.sqrt(1025),0,Math.PI*2,"red");
+	AddEnemies(10,100/Math.sqrt(1650),320,100/Math.sqrt(1650),Math.sqrt(1650),0,Math.PI*2,"red");
+	AddEnemies(250,100/Math.sqrt(2675),450,100/Math.sqrt(2675),Math.sqrt(2675),0,Math.PI*2,"red");break;
+	case 8:AddEnemies(200,100/10,200,100/10,10,0,Math.PI*2,"yellow");
+    AddEnemies(220,100/20,180,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(210,100/20,190,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(205,100/20,205,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(200,100/20,200,100/20,20,0,Math.PI*2,"orange");break;
+	case 9:AddEnemies(400,100/30,450,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(300,100/25,100,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(300,100/35,100,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(300,100/40,100,100/40,40,0,Math.PI*2,"red");
+	AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(300,100/15,100,100/15,15,0,Math.PI*2,"yellow");break;
+	case 10:AddEnemies(459,100/46,137,100/46,46,0,Math.PI*2,"red");
+    AddEnemies(459,100/30,137,100/30,30,0,Math.PI*2,"red");
+	AddEnemies(459,100/15,137,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(459,100/15,137,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(459,100/17,137,100/17,17,0,Math.PI*2,"yellow");
+	AddEnemies(459,100/19,137,100/15,19,0,Math.PI*2,"yellow");break;
+	case 11:AddEnemies(100,100/1,100,100/1,1,0,Math.PI*2,"yellow");
+    AddEnemies(400,100/1,100,100/1,1,0,Math.PI*2,"yellow");
+	AddEnemies(100,100/1,400,100/1,1,0,Math.PI*2,"yellow");
+	AddEnemies(400,100/1,400,100/1,1,0,Math.PI*2,"yellow");break;
+	case 12:AddEnemies(38,100/30,74,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(344,100/40,289,100/40,40,0,Math.PI*2,"red");
+	AddEnemies(112,100/25,412,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(250,100/20,250,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(129,100/15,356,100/15,10,0,Math.PI*2,"yellow");
+	AddEnemies(398,100/15,57,100/15,19,0,Math.PI*2,"yellow");break;
+	case 13:AddEnemies(0,100/15,0,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(500,100/15,500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(0,100/27,500,100/27,27,0,Math.PI*2,"red");
+	AddEnemies(500,100/27,0,100/27,27,0,Math.PI*2,"red");break;
+	case 14:AddEnemies(250,100/20,200,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(150,100/25,380,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(270,100/Math.sqrt(1025),50,100/Math.sqrt(1025),Math.sqrt(1025),0,Math.PI*2,"red");
+	AddEnemies(290,100/Math.sqrt(1650),380,100/Math.sqrt(1650),Math.sqrt(1650),0,Math.PI*2,"red");
+	AddEnemies(20,100/Math.sqrt(2675),450,100/Math.sqrt(2675),Math.sqrt(2675),0,Math.PI*2,"red");
+	AddEnemies(450,100/Math.sqrt(4325),450,100/Math.sqrt(4325),Math.sqrt(4325),0,Math.PI*2,"red");
+	AddEnemies(450,100/15,273,100/15,15,0,Math.PI*2,"yellow");break;
+	case 15:AddEnemies(250,100/40,100,100/40,40,0,Math.PI*2,"red");
+	AddEnemies(150,100/30,400,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(400,100/25,400,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(250,100/19,100,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(150,100/19,400,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(400,100/19,400,100/19,19,0,Math.PI*2,"yellow");break;
+	case 16:AddEnemies(397,100/30,123,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(250,100/59,498,100/59,59,0,Math.PI*2,"red");
+	AddEnemies(112,100/35,274,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(397,100/25,384,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(370,100/18,210,100/18,18,0,Math.PI*2,"yellow");
+	AddEnemies(102,100/15,154,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(218,100/10,118,100/10,10,0,Math.PI*2,"yellow");
+	AddEnemies(250,100/5,426,100/5,5,0,Math.PI*2,"yellow");break;
+	case 17:AddEnemies(453,100/40,112,100/40,40,0,Math.PI*2,"red");
+    AddEnemies(250,100/15,50,100/15,15,0,Math.PI*2,"yellow");
+    AddEnemies(300,100/15,100,100/15,15,0,Math.PI*2,"yellow");
+    AddEnemies(375,100/15,412,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(276,100/15,418,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(12,100/16,296,100/16,16,0,Math.PI*2,"yellow");
+	AddEnemies(482,100/17,497,100/17,17,0,Math.PI*2,"yellow");break;
+	case 18:AddEnemies(250,100/30,450,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(45,100/50,423,100/50,50,0,Math.PI*2,"red");
+	AddEnemies(196,100/35,212,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(74,100/25,119,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(241,100/20,276,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(380,100/15,376,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(257,100/18,434,100/18,18,0,Math.PI*2,"yellow");break;
+	case 19:AddEnemies(350,100/30,350,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(450,100/59,450,100/59,59,0,Math.PI*2,"red");
+	AddEnemies(400,100/35,400,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(300,100/25,300,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(200,100/18,300,100/18,18,0,Math.PI*2,"yellow");
+	AddEnemies(150,100/15,350,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(100,100/10,400,100/10,10,0,Math.PI*2,"yellow");
+	AddEnemies(50,100/5,450,100/5,5,0,Math.PI*2,"yellow");break;
+	case 20:AddEnemies(152,100/35,374,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(482,100/55,426,100/55,55,0,Math.PI*2,"red");
+    AddEnemies(70,100/20,109,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(61,100/20,89,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(48,100/20,102,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(56,100/20,110,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(50,100/19,100,100/19,19,0,Math.PI*2,"yellow");break;
+	case 21:AddEnemies(73,100/60,89,100/60,60,0,Math.PI*2,"red");
+    AddEnemies(450,100/45,450,100/45,45,0,Math.PI*2,"red");
+	AddEnemies(269,100/35,400,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(386,100/25,79,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(497,100/20,243,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(396,100/18,420,100/18,18,0,Math.PI*2,"yellow");
+	AddEnemies(52,100/15,412,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(233,100/10,84,100/10,10,0,Math.PI*2,"yellow");
+	AddEnemies(23,100/9,213,100/9,9,0,Math.PI*2,"yellow");break;
+	case 22:AddEnemies(23,100/50,496,100/50,50,0,Math.PI*2,"red");
+	AddEnemies(496,100/70,23,100/70,70,0,Math.PI*2,"red");
+    AddEnemies(46,100/19,112,100/19,19,0,Math.PI*2,"yellow");
+    AddEnemies(152,100/19,23,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(252,100/19,452,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(480,100/19,212,100/19,19,0,Math.PI*2,"yellow");
+    AddEnemies(375,100/19,408,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(267,100/15,100,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(12,100/16,259,100/16,16,0,Math.PI*2,"yellow");
+	AddEnemies(412,100/17,47,100/17,17,0,Math.PI*2,"yellow");break;
+	case 23:AddEnemies(61,100/60,457,100/60,60,0,Math.PI*2,"red");
+    AddEnemies(396,100/45,84,100/45,45,0,Math.PI*2,"red");
+	AddEnemies(491,100/35,170,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(167,100/25,239,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(497,100/30,243,100/30,30,0,Math.PI*2,"red");
+	AddEnemies(312,100/18,420,100/18,18,0,Math.PI*2,"yellow");
+	AddEnemies(152,100/15,74,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(296,100/10,164,100/10,10,0,Math.PI*2,"yellow");
+	AddEnemies(268,100/9,379,100/9,9,0,Math.PI*2,"yellow");break;
+	case 24:AddEnemies(17,100/40,450,100/40,40,0,Math.PI*2,"red");
+    AddEnemies(300,100/60,150,100/60,60,0,Math.PI*2,"red");
+	AddEnemies(257,100/25,410,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(356,100/15,176,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(121,100/15,43,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(296,100/15,324,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(247,100/15,117,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(412,100/15,300,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(300,100/15,100,100/15,15,0,Math.PI*2,"yellow");break;
+	case 25:AddEnemies(50,100/55,50,100/55,55,0,Math.PI*2,"red");
+    AddEnemies(50,100/35,450,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(450,100/45,450,100/45,45,0,Math.PI*2,"red");
+	AddEnemies(450,100/25,50,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(50,100/19,250,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(250,100/18,450,100/18,18,0,Math.PI*2,"yellow");
+	AddEnemies(450,100/17,250,100/17,17,0,Math.PI*2,"yellow");
+	AddEnemies(250,100/16,50,100/16,16,0,Math.PI*2,"yellow");break;
+	case 26:AddEnemies(165,100/65,250,100/65,65,0,Math.PI*2,"red");
+    AddEnemies(369,100/35,123,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(258,100/25,456,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(147,100/24,321,100/24,24,0,Math.PI*2,"red");
+	AddEnemies(357,100/22,159,100/22,22,0,Math.PI*2,"red");
+	AddEnemies(47,100/16,189,100/16,16,0,Math.PI*2,"yellow");
+	AddEnemies(407,100/15,217,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(343,100/19,34,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(156,100/15,432,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(267,100/18,312,100/18,18,0,Math.PI*2,"yellow");
+	AddEnemies(69,100/15,69,100/15,15,0,Math.PI*2,"yellow");break;
+	case 27:AddEnemies(119,100/Math.sqrt(7000),276,100/Math.sqrt(7000),Math.sqrt(7000),0,Math.PI*2,"red");
+	AddEnemies(450,100/25,320,100/25,25,0,Math.PI*2,"red");
+	AddEnemies(270,100/Math.sqrt(1025),150,100/Math.sqrt(1025),Math.sqrt(1025),0,Math.PI*2,"red");
+	AddEnemies(45,100/Math.sqrt(1650),56,100/Math.sqrt(1650),Math.sqrt(1650),0,Math.PI*2,"red");
+	AddEnemies(20,100/Math.sqrt(2675),450,100/Math.sqrt(2675),Math.sqrt(2675),0,Math.PI*2,"red");
+	AddEnemies(70,100/Math.sqrt(4325),196,100/Math.sqrt(4325),Math.sqrt(4325),0,Math.PI*2,"red");
+	AddEnemies(250,100/20,220,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(186,100/15,273,100/15,15,0,Math.PI*2,"yellow");break;
+	case 28:AddEnemies(423,100/60,412,100/60,60,0,Math.PI*2,"red");
+	AddEnemies(123,100/45,396,100/45,45,0,Math.PI*2,"red");
+	AddEnemies(100,100/30,412,100/30,30,0,Math.PI*2,"red");
+    AddEnemies(312,100/25,56,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(423,100/19,412,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(123,100/19,396,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(100,100/19,412,100/19,19,0,Math.PI*2,"yellow");
+	AddEnemies(312,100/19,56,100/19,19,0,Math.PI*2,"yellow");break;
+	case 29:AddEnemies(412,100/35,399,100/35,35,0,Math.PI*2,"red");
+	AddEnemies(449,100/55,112,100/55,55,0,Math.PI*2,"red");
+	AddEnemies(37,100/65,150,100/65,65,0,Math.PI*2,"red");
+	AddEnemies(46,100/80,350,100/80,80,0,Math.PI*2,"red");
+    AddEnemies(343,100/20,256,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(357,100/20,256,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(343,100/20,276,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(357,100/20,276,100/20,20,0,Math.PI*2,"orange");
+	AddEnemies(350,100/19,266,100/19,19,0,Math.PI*2,"yellow");break;
+	case 30:AddEnemies(491,100/80,496,100/80,122,0,Math.PI*2,"red");
+	AddEnemies(150,100/75,276,100/75,75,0,Math.PI*2,"red");
+	AddEnemies(53,100/60,76,100/60,60,0,Math.PI*2,"red");
+    AddEnemies(250,100/50,73,100/50,50,0,Math.PI*2,"red");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");
+	AddEnemies(Math.random()*500,100/15,Math.random()*500,100/15,15,0,Math.PI*2,"yellow");break;
+	}
+	Update();
+	ctx.fillStyle = "white";
+	ctx.font = '36pt Segoe UI Light';
+	ctx.fillText("Level: " + WhichLevel,175,50);
+	if (WhichLevel > 2){
+		setTimeout(function(){Refresh = setInterval(Update,25);
+		RefreshPos = setInterval(UpdateEnemyPosition,35);}, 1500);
+		}
+	else if (WhichLevel == 1) {
+		ctx.fillStyle = "white";
+		ctx.font = '18pt Segoe UI Light';
+		ctx.fillText("Welcome to Pirkl",162,100);
+		ctx.fillText("Avoid the bigger red guys",120,150);
+		ctx.fillText("Eat the smaller yellow guys to grow bigger",35,350);
+		ctx.fillText("And the orange guys are harmless. Or are they?",10,400);
+		setTimeout(function(){Refresh = setInterval(Update,25);
+			RefreshPos = setInterval(UpdateEnemyPosition,35);}, 6500);}	
+	else if (WhichLevel == 2){
+		ctx.fillStyle = "white";
+		ctx.font = '18pt Segoe UI Light';
+		ctx.fillText("You can press space to speed up",88,200);
+		ctx.fillText("However you will also shrink when you do",40,250);
+		ctx.fillText("You will grow back, I Promise",103,300);
+		setTimeout(function(){Refresh = setInterval(Update,25);
+			RefreshPos = setInterval(UpdateEnemyPosition,35);}, 5500);}	
+}
+var levelclick = function(event){
+	if (Math.abs(event.pageX - 50) <= 40 && Math.abs(event.pageY - 50) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		Menu = setInterval(MainMenu,25);}
+	if (Math.abs(event.pageX - 450) <= 40 && Math.abs(event.pageY - 50) <= 40){
+		if (Shift == 1){Shift = -1;}
+		else {Shift = 1;}}
+	if (Math.abs(event.pageX - (Levelx + 9)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 1;
+		LevelStart(WhichLevel);}	
+	else if (Math.abs(event.pageX - (Levelx+109)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 2;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+209)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 3;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+309)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 4;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+409)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 5;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+9)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 6;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+109)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 7;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+209)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 8;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+309)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+		clearInterval(Stages);
+		WhichLevel = 9;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+409)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 10;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+9)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 11;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+109)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 12;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+209)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 13;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+309)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 14;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+409)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 15;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+499)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 16;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+599)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 17;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+699)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 18;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+799)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 19;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+899)) <= 40 && Math.abs(event.pageY - 159) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 20;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+499)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 21;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+599)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 22;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+699)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 23;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+799)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 24;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+899)) <= 40 && Math.abs(event.pageY - 309) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 25;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+499)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 26;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+599)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 27;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+699)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 28;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+799)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 29;
+		LevelStart(WhichLevel);}
+	else if (Math.abs(event.pageX - (Levelx+899)) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		document.removeEventListener("click",levelclick);
+			clearInterval(Stages);
+		WhichLevel = 30;
+		LevelStart(WhichLevel);}
+	
+}
+function Slide(){
+	ctx.font = "18pt Segoe UI Light";
+	if (Shift == 1 && Levelx > -440){
+		Levelx -= 10;
+	}
+	else if (Shift == -1 && Levelx < 50){
+		Levelx += 10;
+	}
+	if (Levelx > -40){ //1,6,11
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx < 50) { //16,21,26
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+490,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+490,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+490,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx > -140){ //2,7,12
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+100,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+100,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+100,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx < -50) { //17,22,27
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+590,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+590,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+590,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx >  -240){ //3,8,13
+		ctx.beginPath();
+		ctx.arc(Levelx+200,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+200,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+200,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx < -150) { //18,23,28
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+690,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+690,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+690,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx > -340){ //4,9,14
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+300,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+300,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+300,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx < -250) { //19,24,29
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+790,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+790,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+790,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx > -440){ //5,10,15
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+400,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+400,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+400,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	if (Levelx < -350) { //20,25,30
+		ctx.beginPath();
+		ctx.fillStyle = "green";
+		ctx.arc(Levelx+890,150,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+890,300,40,0,2*Math.PI);
+		ctx.fill();
+		ctx.beginPath();
+		ctx.arc(Levelx+890,450,40,0,2*Math.PI);
+		ctx.fill();
+	}
+	ctx.fillStyle = "white";
+	if (Levelx > -440){
+		ctx.fillText("1             2             3              4              5",Levelx-6,158);
+		ctx.fillText("6             7             8              9             10",Levelx-6,308);
+		ctx.fillText("11             12            13            14            15",Levelx-16,458);
+	}
+	if (Levelx < 40) {
+		ctx.fillText("16            17            18            19           20",Levelx+476,158);
+		ctx.fillText("21            22           23            24            25",Levelx+476,308);
+		ctx.fillText("26            27           28            29           30",Levelx+476,458);
+	}
+}
+var optionmouse = function(event){
+	if (Math.abs(event.pageX - 274) <= 40 && Math.abs(event.pageY - 254) <= 40){
+		OnRad = 50;}
+	else if (Math.abs(event.pageX - 379) <= 40 && Math.abs(event.pageY - 254) <= 40){
+		OffRad = 50;}
+	else if (Math.abs(event.pageX - 459) <= 40 && Math.abs(event.pageY - 459) <= 40){
+		BackRad = 50;}
+	else if (Math.abs(event.pageX - 274) <= 30 && Math.abs(event.pageY - 354) <= 30){
+		UpRad = 40;}
+	else if (Math.abs(event.pageX - 379) <= 30 && Math.abs(event.pageY - 354) <= 30){
+		DownRad = 40;}
+
+	else {OnRad = 40;
+	OffRad = 40;
+	BackRad = 40;
+	UpRad = 30;
+	DownRad = 30;}
+}
+var optionclick = function(){
+	if (OnRad == 50 && music.paused == true){
+		music.load();
+		music.play();}
+	else if (OffRad == 50 && music.paused == false){
+		music.pause();}
+	else if (UpRad == 40 && music.volume < 1){
+		music.volume += 0.1;}
+	else if (DownRad == 40 && music.volume >= 0.1){
+		music.volume -= 0.1;}	
+	else if (BackRad == 50){
+	document.removeEventListener("mousemove",optionmouse);
+	document.removeEventListener("click",optionclick);
+	clearInterval(Options);
+	Menu = setInterval(MainMenu,25);}	
+}
+var mousemove = function(event){
+	if (Math.abs(event.pageX - 257) <= 40 && Math.abs(event.pageY - 184) <= 40){
+		LevelRad = 50;}
+	else if (Math.abs(event.pageX - 257) <= 40 && Math.abs(event.pageY - 284) <= 40){
+		OptionRad = 50;}
+	else if (Math.abs(event.pageX - 257) <= 40 && Math.abs(event.pageY - 384) <= 40){
+		ArcadeRad = 50;}
+	else {LevelRad = 40;
+	  OptionRad = 40;
+	  ArcadeRad = 40;}
+}
+var click = function(){
+	if (ArcadeRad == 50){
+		document.removeEventListener("mousemove",mousemove);
+		PlayerRefresh();
+		Arcade = true;
+		score = 20;
+		document.removeEventListener("click",click);
+	}
+	else if (OptionRad == 50){
+		document.removeEventListener("mousemove",mousemove);
+		document.removeEventListener("click",click);
+		clearInterval(Menu);
+		Options = setInterval(Option,25);
+	}
+	else if (LevelRad == 50){
+		document.removeEventListener("mousemove",mousemove);
+		document.removeEventListener("click",click);
+		clearInterval(Menu);
+		Stages = setInterval(Levels,25);}
+}
+document.onkeydown = function(event){
+	if(Player.Alive){
+		if(event.keyCode == 32){ //Space
+			Player.spdx = Player.maxspdx * 2;
+			Player.spdy = Player.maxspdy * 2;
+			Player.Speeding = true;}
+		if(event.keyCode == 68){ //D
+			Player.pressingRight = true;}
+		else if(event.keyCode == 83){ //S
+			Player.pressingDown = true;}
+		else if(event.keyCode == 65){ //A
+			Player.pressingLeft = true;}
+		else if(event.keyCode == 87){ //W
+			Player.pressingUp = true}
+	}
+	else if(Player.Alive == false && event.keyCode == 82 && Playing){ //R
+		if (Arcade){
+			PlayerRefresh();
+			score = 20;}	
+		else {
+			clearInterval(Refresh);
+			clearInterval(RefreshPos);
+			LevelStart(WhichLevel);}	
+	}
+	else if(Player.Alive == false && event.keyCode == 81 && Playing){ //Q
+		clearInterval(Refresh);
+		clearInterval(RefreshPos);
+		Playing = false;
+		Enemylist.length = 0;
+		if (Arcade){
+			clearInterval(RefreshGen);
+			Arcade = false;
+			Menu = setInterval(MainMenu,25);}
+		else {
+			Stages = setInterval(Levels,25);}	
+		
+	}
+	else if(Player.Alive == false && event.keyCode == 69 && Playing && Enemylist.length == 0 && Arcade == false){ //E
+		WhichLevel += 1;
+		if (WhichLevel <= 30){
+			LevelStart(WhichLevel);}
+		else {
+			WhichLevel = 30;
+			PlayerRefresh();
+			Arcade = true;
+			score = 20;
+			Refresh = setInterval(Update,25);
+			RefreshPos = setInterval(UpdateEnemyPosition,35);
+			RefreshGen = setInterval(GenerateEnemy,2500);}	
+	}
+}
+document.onkeyup = function(event){
+	if(event.keyCode == 32){ //space
+		Player.spdx = Player.maxspdx;
+		Player.spdy = Player.maxspdy;
+		Player.Speeding = false;}
+	if(event.keyCode == 68){ //d
+		Player.pressingRight = false;}
+	else if(event.keyCode == 83){ //s
+		Player.pressingDown = false;}
+	else if(event.keyCode == 65){ //a
+		Player.pressingLeft = false;}
+	else if(event.keyCode == 87){ //w
+		Player.pressingUp = false;}
+}
+Menu = setInterval(MainMenu,25);
+/* Things to do:
+Canvas has been centered so things that relied on its positiong needs to be modified
+*/
+</script>
