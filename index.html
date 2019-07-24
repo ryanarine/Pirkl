@@ -473,7 +473,7 @@ function LevelStart(Level){
 	switch(Level){
 	case 1:AddEnemies(400,100/30,450,100/30,30,0,Math.PI*2,"red");
 	AddEnemies(200,100/20,250,100/20,20,0,Math.PI*2,"orange");
-	AddEnemies(300,100/15,200,100/15,15,0,Math.PI*2,"yellow");break;
+	AddEnemies(300,100/15,225,100/15,15,0,Math.PI*2,"yellow");break;
 	case 2:AddEnemies(400,100/30,450,100/30,30,0,Math.PI*2,"red");
     AddEnemies(300,100/25,100,100/25,25,0,Math.PI*2,"red");
 	AddEnemies(400,100/15,450,100/15,15,0,Math.PI*2,"yellow");
@@ -702,7 +702,8 @@ function LevelStart(Level){
 		ctx.fillStyle = "white";
 		ctx.font = '18pt Segoe UI Light';
 		ctx.fillText("Welcome to Pirkl",162,100);
-		ctx.fillText("Avoid the bigger red guys",120,150);
+		ctx.fillText("WASD keys to move",145,150);
+		ctx.fillText("Avoid the bigger red guys",120,200);
 		ctx.fillText("Eat the smaller yellow guys to grow bigger",35,350);
 		ctx.fillText("And the orange guys are harmless. Or are they?",10,400);
 		setTimeout(function(){Refresh = setInterval(Update,25);
